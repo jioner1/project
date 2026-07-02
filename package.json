@@ -1,0 +1,16 @@
+{
+  "name": "anon-notepad",
+  "version": "1.0.0",
+  "description": "Анонимный блокнот с шифрованием, без серверов",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}
