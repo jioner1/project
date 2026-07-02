@@ -1,0 +1,574 @@
+DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#1E1E1E">
+<link rel="manifest" href="manifest.json">
+<title>Блокнот</title>
+<style>
+  :root{
+    --bg: #1E1E1E;
+    --panel: #2C2C2C;
+    --panel-2: #262626;
+    --text: #E8E8E8;
+    --muted: #8f8f8f;
+    --accent: #C9A66B;
+    --accent-dim: #8f7549;
+    --danger: #B85C5C;
+    --border: #3a3a3a;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #app{ height:100dvh; display:flex; flex-direction:column; position:relative; }
+
+  .screen{ position:absolute; inset:0; display:flex; flex-direction:column; background:var(--bg); }
+  .hidden{ display:none !important; }
+
+  /* --- Экран блокировки --- */
+  #lockScreen{ align-items:center; justify-content:center; padding:24px; text-align:center; }
+  .lock-icon{ font-size:34px; margin-bottom:10px; opacity:.85; }
+  .lock-title{ font-size:19px; font-weight:600; margin-bottom:6px; }
+  .lock-sub{ color:var(--muted); font-size:13px; margin-bottom:26px; max-width:280px; line-height:1.5; }
+  .pass-input{
+    width:100%; max-width:280px;
+    background:var(--panel); border:1px solid var(--border);
+    color:var(--text); font-size:16px; padding:14px 16px;
+    border-radius:12px; outline:none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing:2px;
+    text-align:center;
+    margin-bottom:12px;
+  }
+  .pass-input:focus{ border-color:var(--accent-dim); }
+  .btn{
+    border:none; border-radius:12px; padding:14px 20px;
+    font-size:15px; font-weight:600; cursor:pointer;
+    width:100%; max-width:280px;
+  }
+  .btn-primary{ background:var(--accent); color:#1a1408; }
+  .btn-primary:active{ background:var(--accent-dim); }
+  .btn-ghost{ background:transparent; color:var(--muted); font-weight:500; font-size:13px; padding:10px; }
+  .lock-error{ color:var(--danger); font-size:13px; min-height:18px; margin-bottom:8px; }
+  .lock-links{ margin-top:22px; display:flex; gap:18px; }
+  .link-btn{ background:none; border:none; color:var(--muted); font-size:12.5px; text-decoration:underline; cursor:pointer; padding:4px; }
+  .remember-row{
+    display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px;
+    margin-bottom:16px; max-width:280px; width:100%; text-align:left; cursor:pointer;
+  }
+  .remember-row input{ width:16px; height:16px; accent-color: var(--accent); }
+
+  /* --- Список заметок --- */
+  #listScreen{ }
+  .topbar{
+    padding: 14px 16px 10px;
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--bg);
+    flex-shrink:0;
+  }
+  .topbar h1{ font-size:22px; margin:0; font-weight:700; }
+  .icon-btn{
+    background:var(--panel); border:none; color:var(--text);
+    width:38px; height:38px; border-radius:10px; font-size:16px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .icon-row{ display:flex; gap:8px; }
+
+  .search-wrap{ padding: 4px 16px 10px; flex-shrink:0; }
+  .search-input{
+    width:100%; background:var(--panel); border:1px solid transparent;
+    color:var(--text); padding:10px 14px; border-radius:10px;
+    font-size:14px; outline:none;
+  }
+  .search-input::placeholder{ color:var(--muted); }
+
+  .notes-list{ flex:1; overflow-y:auto; padding: 4px 12px 90px; }
+  .note-card{
+    background:var(--panel);
+    border-radius:14px;
+    padding:14px 14px;
+    margin-bottom:9px;
+    cursor:pointer;
+    position:relative;
+  }
+  .note-card:active{ background:var(--panel-2); }
+  .note-title{ font-size:15px; font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .note-preview{ font-size:13px; color:var(--muted); line-height:1.4; max-height:34px; overflow:hidden; }
+  .note-meta{ font-size:11px; color:var(--muted); margin-top:8px; display:flex; justify-content:space-between; }
+  .pin-dot{ color:var(--accent); margin-right:5px; }
+
+  .empty-state{ text-align:center; color:var(--muted); padding:60px 30px; font-size:13.5px; line-height:1.6; }
+  .empty-state div:first-child{ font-size:30px; margin-bottom:10px; }
+
+  .fab{
+    position:absolute; right:18px; bottom:24px;
+    width:56px; height:56px; border-radius:28px;
+    background:var(--accent); color:#1a1408;
+    border:none; font-size:26px; cursor:pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,.4);
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  /* --- Редактор --- */
+  #editorScreen{ }
+  .editor-top{
+    padding:12px 10px; display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0;
+  }
+  .editor-top-right{ display:flex; gap:6px; }
+  textarea#noteTitle{
+    resize:none; border:none; background:transparent; color:var(--text);
+    font-size:20px; font-weight:700; padding:8px 16px 0; outline:none;
+    font-family:inherit; height:34px;
+  }
+  textarea#noteBody{
+    flex:1; resize:none; border:none; background:transparent; color:var(--text);
+    font-size:15.5px; line-height:1.6; padding:6px 16px 16px; outline:none;
+    font-family:inherit;
+  }
+  .editor-footer{
+    padding:8px 16px 16px; display:flex; justify-content:space-between; align-items:center;
+    color:var(--muted); font-size:11.5px; flex-shrink:0;
+  }
+  .save-dot{ display:flex; align-items:center; gap:5px; }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); }
+
+  /* --- Меню действий (bottom sheet) --- */
+  .sheet-backdrop{
+    position:absolute; inset:0; background:rgba(0,0,0,.5); z-index:20;
+  }
+  .sheet{
+    position:absolute; left:0; right:0; bottom:0; z-index:21;
+    background:var(--panel); border-radius:18px 18px 0 0;
+    padding:10px 14px 24px;
+  }
+  .sheet-handle{ width:36px; height:4px; background:var(--border); border-radius:2px; margin:6px auto 14px; }
+  .sheet-item{
+    display:flex; align-items:center; gap:12px;
+    padding:14px 10px; font-size:15px; cursor:pointer; border-radius:10px;
+  }
+  .sheet-item:active{ background:var(--panel-2); }
+  .sheet-item.danger{ color:var(--danger); }
+  .sheet-icon{ width:22px; text-align:center; }
+
+  input[type=file]{ display:none; }
+
+  .toast{
+    position:absolute; left:50%; bottom:30px; transform:translateX(-50%);
+    background:var(--panel); border:1px solid var(--border);
+    padding:10px 18px; border-radius:10px; font-size:13px;
+    z-index:40; opacity:0; transition:opacity .25s;
+    pointer-events:none; max-width:85%; text-align:center;
+  }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Экран блокировки -->
+  <div id="lockScreen" class="screen">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title" id="lockTitle">Блокнот заблокирован</div>
+    <div class="lock-sub" id="lockSub">Ничего не отправляется никуда. Всё шифруется прямо на телефоне и хранится только у тебя.</div>
+    <div class="lock-error" id="lockError"></div>
+    <input type="password" id="passInput" class="pass-input" placeholder="Пароль" autocomplete="off">
+    <input type="password" id="passInput2" class="pass-input hidden" placeholder="Повтори пароль" autocomplete="off">
+    <label class="remember-row hidden" id="rememberRow">
+      <input type="checkbox" id="rememberCheck" checked>
+      <span>Запомнить на этом телефоне</span>
+    </label>
+    <button class="btn btn-primary" id="unlockBtn">Открыть</button>
+    <div class="lock-links">
+      <button class="link-btn" id="importLink">Загрузить файл блокнота</button>
+    </div>
+    <input type="file" id="fileInput" accept=".notes,.txt">
+  </div>
+
+  <!-- Список заметок -->
+  <div id="listScreen" class="screen hidden">
+    <div class="topbar">
+      <h1>Блокнот</h1>
+      <div class="icon-row">
+        <button class="icon-btn" id="menuBtn">⋯</button>
+        <button class="icon-btn" id="lockBtn">🔒</button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input class="search-input" id="searchInput" placeholder="Поиск по заметкам">
+    </div>
+    <div class="notes-list" id="notesList"></div>
+    <button class="fab" id="addBtn">+</button>
+  </div>
+
+  <!-- Редактор заметки -->
+  <div id="editorScreen" class="screen hidden">
+    <div class="editor-top">
+      <button class="icon-btn" id="backBtn">←</button>
+      <div class="editor-top-right">
+        <button class="icon-btn" id="pinBtn">📌</button>
+        <button class="icon-btn" id="deleteBtn">🗑</button>
+      </div>
+    </div>
+    <textarea id="noteTitle" placeholder="Заголовок" rows="1"></textarea>
+    <textarea id="noteBody" placeholder="Пиши что угодно..."></textarea>
+    <div class="editor-footer">
+      <span id="charCount">0 символов</span>
+      <span class="save-dot"><span class="dot"></span> сохранено локально</span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+let notes = [];
+let cryptoKey = null;
+let salt = null;
+let hasVaultInMemory = false;
+let currentNoteId = null;
+let importedPackage = null;
+let persistMode = false;
+
+const STORAGE_KEY = 'anon_notepad_vault_v1';
+
+function hasStorage(){
+  try{
+    return typeof localStorage !== 'undefined';
+  }catch(e){ return false; }
+}
+
+function readStoredVault(){
+  if (!hasStorage()) return null;
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function writeStoredVault(pkg){
+  if (!hasStorage()) return;
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(pkg)); }catch(e){}
+}
+
+function clearStoredVault(){
+  if (!hasStorage()) return;
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+}
+
+const el = id => document.getElementById(id);
+const screens = { lock: el('lockScreen'), list: el('listScreen'), editor: el('editorScreen') };
+
+function showScreen(name){
+  Object.values(screens).forEach(s => s.classList.add('hidden'));
+  screens[name].classList.remove('hidden');
+}
+
+function toast(msg){
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 1800);
+}
+
+function b64encode(buf){
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function b64decode(str){
+  return Uint8Array.from(atob(str), c => c.charCodeAt(0)).buffer;
+}
+
+async function deriveKey(password, saltBytes){
+  const baseKey = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt: saltBytes, iterations: 220000, hash:'SHA-256' },
+    baseKey,
+    { name:'AES-GCM', length:256 },
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+async function encryptNotes(){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = enc.encode(JSON.stringify(notes));
+  const cipher = await crypto.subtle.encrypt({name:'AES-GCM', iv}, cryptoKey, data);
+  return {
+    salt: b64encode(salt),
+    iv: b64encode(iv),
+    data: b64encode(cipher)
+  };
+}
+
+async function decryptPackage(pkg, password){
+  const saltBytes = new Uint8Array(b64decode(pkg.salt));
+  const ivBytes = new Uint8Array(b64decode(pkg.iv));
+  const key = await deriveKey(password, saltBytes);
+  const plain = await crypto.subtle.decrypt(
+    {name:'AES-GCM', iv: ivBytes}, key, b64decode(pkg.data)
+  );
+  return { key, salt: saltBytes, notes: JSON.parse(dec.decode(plain)) };
+}
+
+function newId(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+
+function formatDate(ts){
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+  return d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', year:'2-digit'});
+}
+
+function renderList(){
+  const list = el('notesList');
+  const q = el('searchInput').value.trim().toLowerCase();
+  let items = [...notes];
+  items.sort((a,b) => (b.pinned - a.pinned) || (b.updated - a.updated));
+  if (q){
+    items = items.filter(n => (n.title + ' ' + n.body).toLowerCase().includes(q));
+  }
+  if (items.length === 0){
+    list.innerHTML = `<div class="empty-state"><div>📓</div>${q ? 'Ничего не нашлось' : 'Пока пусто.<br>Нажми «+», чтобы начать'}</div>`;
+    return;
+  }
+  list.innerHTML = items.map(n => {
+    const title = n.title.trim() || 'Без названия';
+    const preview = n.body.trim().slice(0,90).replace(/\n/g,' ') || 'Пустая заметка';
+    return `<div class="note-card" data-id="${n.id}">
+      <div class="note-title">${n.pinned ? '<span class="pin-dot">📌</span>' : ''}${escapeHtml(title)}</div>
+      <div class="note-preview">${escapeHtml(preview)}</div>
+      <div class="note-meta"><span>${formatDate(n.updated)}</span><span>${n.body.length} симв.</span></div>
+    </div>`;
+  }).join('');
+  [...list.querySelectorAll('.note-card')].forEach(cardEl => {
+    cardEl.addEventListener('click', () => openNote(cardEl.dataset.id));
+  });
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function openNote(id){
+  currentNoteId = id;
+  const n = notes.find(x => x.id === id);
+  el('noteTitle').value = n.title;
+  el('noteBody').value = n.body;
+  el('pinBtn').style.opacity = n.pinned ? '1' : '.5';
+  updateCharCount();
+  showScreen('editor');
+  setTimeout(() => el('noteBody').focus(), 50);
+}
+
+function createNote(){
+  const n = { id:newId(), title:'', body:'', pinned:false, updated: Date.now(), created: Date.now() };
+  notes.push(n);
+  openNote(n.id);
+}
+
+function updateCharCount(){
+  el('charCount').textContent = el('noteBody').value.length + ' символов';
+}
+
+let saveTimeout = null;
+function scheduleSave(){
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    const n = notes.find(x => x.id === currentNoteId);
+    if (!n) return;
+    n.title = el('noteTitle').value;
+    n.body = el('noteBody').value;
+    n.updated = Date.now();
+    if (persistMode) await persistToStorage();
+  }, 250);
+}
+
+async function persistToStorage(){
+  if (!persistMode || !cryptoKey) return;
+  const pkg = await encryptNotes();
+  writeStoredVault(pkg);
+}
+
+el('noteTitle').addEventListener('input', () => { scheduleSave(); });
+el('noteBody').addEventListener('input', () => { scheduleSave(); updateCharCount(); });
+
+el('backBtn').addEventListener('click', () => {
+  const n = notes.find(x => x.id === currentNoteId);
+  if (n && !n.title.trim() && !n.body.trim()){
+    notes = notes.filter(x => x.id !== currentNoteId);
+  }
+  currentNoteId = null;
+  renderList();
+  showScreen('list');
+});
+
+el('pinBtn').addEventListener('click', async () => {
+  const n = notes.find(x => x.id === currentNoteId);
+  n.pinned = !n.pinned;
+  el('pinBtn').style.opacity = n.pinned ? '1' : '.5';
+  toast(n.pinned ? 'Закреплено' : 'Откреплено');
+  if (persistMode) await persistToStorage();
+});
+
+el('deleteBtn').addEventListener('click', async () => {
+  if (!confirm('Удалить заметку без возможности восстановления?')) return;
+  notes = notes.filter(x => x.id !== currentNoteId);
+  currentNoteId = null;
+  renderList();
+  showScreen('list');
+  toast('Заметка удалена');
+  if (persistMode) await persistToStorage();
+});
+
+el('addBtn').addEventListener('click', createNote);
+el('searchInput').addEventListener('input', renderList);
+
+el('lockBtn').addEventListener('click', () => lockVault());
+
+async function lockVault(){
+  const pkgBefore = await encryptNotes();
+  if (persistMode){
+    writeStoredVault(pkgBefore);
+  }
+  importedPackage = pkgBefore;
+  hasVaultInMemory = true;
+  notes = [];
+  cryptoKey = null;
+  salt = null;
+  el('passInput').value = '';
+  el('passInput2').classList.add('hidden');
+  el('rememberRow').classList.add('hidden');
+  el('lockTitle').textContent = 'Блокнот заблокирован';
+  el('lockSub').textContent = persistMode
+    ? 'Заметки сохранены на этом телефоне в зашифрованном виде. Введи пароль, чтобы открыть.'
+    : 'Заметки хранятся только в памяти этой сессии. Введи пароль, чтобы открыть.';
+  el('lockError').textContent = '';
+  showScreen('lock');
+  setTimeout(() => el('passInput').focus(), 50);
+}
+
+el('unlockBtn').addEventListener('click', handleUnlock);
+el('passInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleUnlock(); });
+el('passInput2').addEventListener('keydown', e => { if (e.key === 'Enter') handleUnlock(); });
+
+async function handleUnlock(){
+  const pass = el('passInput').value;
+  el('lockError').textContent = '';
+  if (!pass){
+    el('lockError').textContent = 'Введи пароль';
+    return;
+  }
+
+  if (importedPackage){
+    try{
+      const result = await decryptPackage(importedPackage, pass);
+      cryptoKey = result.key;
+      salt = result.salt;
+      notes = result.notes;
+      hasVaultInMemory = true;
+      enterApp();
+    }catch(e){
+      el('lockError').textContent = 'Неверный пароль';
+    }
+    return;
+  }
+
+  if (!hasVaultInMemory){
+    const pass2 = el('passInput2');
+    const rememberRow = el('rememberRow');
+    if (pass2.classList.contains('hidden')){
+      pass2.classList.remove('hidden');
+      rememberRow.classList.remove('hidden');
+      el('lockTitle').textContent = 'Придумай пароль';
+      el('lockSub').textContent = 'Он шифрует все заметки. Если забудешь его — восстановить содержимое будет невозможно.';
+      pass2.focus();
+      return;
+    }
+    if (pass !== pass2.value){
+      el('lockError').textContent = 'Пароли не совпадают';
+      return;
+    }
+    persistMode = el('rememberCheck').checked && hasStorage();
+    salt = crypto.getRandomValues(new Uint8Array(16));
+    cryptoKey = await deriveKey(pass, salt);
+    notes = [];
+    hasVaultInMemory = true;
+    if (persistMode) await persistToStorage();
+    enterApp();
+    return;
+  }
+}
+
+function enterApp(){
+  el('passInput').value = '';
+  el('passInput2').value = '';
+  el('passInput2').classList.add('hidden');
+  renderList();
+  showScreen('list');
+}
+
+el('importLink').addEventListener('click', () => el('fileInput').click());
+el('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try{
+    const text = await file.text();
+    const pkg = JSON.parse(atob(text.trim()));
+    if (!pkg.salt || !pkg.iv || !pkg.data) throw new Error('bad file');
+    importedPackage = pkg;
+    hasVaultInMemory = true;
+    el('lockTitle').textContent = 'Файл загружен';
+    el('lockSub').textContent = 'Введи пароль от этого блокнота.';
+    el('passInput2').classList.add('hidden');
+    el('passInput').focus();
+    toast('Файл прочитан, введи пароль');
+  }catch(err){
+    el('lockError').textContent = 'Файл повреждён или это не блокнот';
+  }
+  e.target.value = '';
+});
+
+el('menuBtn').addEventListener('click', openMenu);
+
+function openMenu(){
+  const backdrop = document.createElement('div');
+  backdrop.className = 'sheet-backdrop';
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  sheet.innerHTML = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-item" id="exportItem"><span class="sheet-icon">📤</span> Сохранить файл блокнота на телефон</div>
+    <div class="sheet-item" id="changePassItem"><span class="sheet-icon">🔑</span> Сменить пароль</div>
+    <div class="sheet-item danger" id="wipeItem"><span class="sheet-icon">⚠️</span> Стереть всё и начать заново</div>
+  `;
+  document.getElementById('app').appendChild(backdrop);
+  document.getElementById('app').appendChild(sheet);
+  backdrop.addEventListener('click', close);
+  function close(){ backdrop.remove(); sheet.remove(); }
+
+  sheet.querySelector('#exportItem').addEventListener('click', async () => {
+    close();
+    await exportVault();
+  });
+  sheet.querySelector('#changePassItem').addEventListener('click', () => {
+    close();
+    changePassword();
+  });
+  sheet.querySelector('#wipeItem').addEventListener('click', () => {
+    close();
+    if (confirm('Все заметки бу
